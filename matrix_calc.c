@@ -18,11 +18,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <stdbool.h>
 
 const int MAX_THREADS = 64;
 
 /* Global variable:  accessible to all threads */
 int thread_count;
+
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void Usage(char* prog_name);
 void *matrizCalc(void* rank);  /* Thread function */
@@ -48,7 +51,7 @@ int main(int argc, char* argv[]) {
     size_matrix = 3; //argv[2];
 
     /* Dynamic allocation for matrices */
-    // Allocating size_matrix
+    // Allocating lines
     a = (int**)malloc(size_matrix * sizeof(int));
     b = (int**)malloc(size_matrix * sizeof(int));
     c = (int**)malloc(size_matrix * sizeof(int));
@@ -79,30 +82,44 @@ int main(int argc, char* argv[]) {
         v_columns[i] = i;
     }
 
+    /* Setting 0 to vector*/
+    for (i = 0; i < size_matrix; i++) {
+        v_lines[i] = 0;
+        v_columns[i] = 0;
+    }
+
     thread_handles = malloc (thread_count*sizeof(pthread_t));
 
     for (thread = 0; thread < thread_count; thread++)  //Creates thread 0 to thread_count-1
         pthread_create(&thread_handles[thread], NULL,
             matrizCalc, (void*) thread);
 
-    // printf("Hello from the main thread\tNumber of lines: %d\tNumber of columns: %d\n", lines, columns); //this is another thread that has no number. It is know as the main thread.
+        // printf("Hello from the main thread\tNumber of lines: %d\tNumber of columns: %d\n", lines, columns); //this is another thread that has no number. It is know as the main thread.
 
-    for (thread = 0; thread < thread_count; thread++)
-    pthread_join(thread_handles[thread], NULL);
+        for (thread = 0; thread < thread_count; thread++)
+            pthread_join(thread_handles[thread], NULL);
 
-    free(thread_handles);
-    return 0;
+        free(thread_handles);
+        return 0;
 
-    free(a);
-    free(b);
-    free(c);
-    free(v_columns);
-    free(v_lines);
-}  /* main */
+        free(a);
+        free(b);
+        free(c);
+        free(v_columns);
+        free(v_lines);
+    }  /* main */
 
     /*------------------------------ | Thread Function | -------------------------------------*/
     void *matrizCalc(void* rank) {
         long my_rank = (long) rank;  /* Use long in case of 64-bit system */
+        bool result;
+        srand(time(NULL));
+
+        // do {
+        //     for (i = 1; result && i < size_matrix; i++){
+        //         result &= v_lines[i];
+        //     }
+        // } while(!result);
 
         printf("Hello from thread %ld of %d\n", my_rank, thread_count);
 
