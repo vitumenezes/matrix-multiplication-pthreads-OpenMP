@@ -20,6 +20,8 @@
 #include <pthread.h>
 #include <stdbool.h>
 
+#include "aux_stack.c"
+
 const int MAX_THREADS = 64;
 
 /* Global variable:  accessible to all threads */
@@ -29,13 +31,12 @@ pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void Usage(char* prog_name);
 void *matrizCalc(void* rank);  /* Thread function */
-int i, j, m, n;
+int i, j, m, n, x, y, count_x = 0, count_y = 0;
 int size_matrix;
 int **a;
 int **b;
 int **c;
-int *v_lines;
-int *v_columns;
+int **v_coordinates;
 
 int main(int argc, char* argv[]) {
     /*-------------------------------- | Main Function |------------------------------------*/
@@ -43,18 +44,19 @@ int main(int argc, char* argv[]) {
     pthread_t* thread_handles;
 
     /* Get number of threads from command line */
-    if (argc != 2) Usage(argv[0]);
+    if (argc != 3) Usage(argv[0]);
         thread_count = strtol(argv[1], NULL, 10);
     if (thread_count <= 0 || thread_count > MAX_THREADS) Usage(argv[0]);
 
     /* Get number of size_matrix */
-    size_matrix = 3; //argv[2];
+    size_matrix = atoi(argv[2]);
+    printf("%d\n", size_matrix);
 
     /* Dynamic allocation for matrices */
     // Allocating lines
-    a = (int**)malloc(size_matrix * sizeof(int));
-    b = (int**)malloc(size_matrix * sizeof(int));
-    c = (int**)malloc(size_matrix * sizeof(int));
+    a = (int**)malloc(size_matrix * sizeof(int*));
+    b = (int**)malloc(size_matrix * sizeof(int*));
+    c = (int**)malloc(size_matrix * sizeof(int*));
 
     // Allocating columns
     for(i = 0; i < size_matrix; i++){
@@ -63,32 +65,58 @@ int main(int argc, char* argv[]) {
         c[i] = (int*)malloc(size_matrix * sizeof(int));
     }
 
-    /* Allocation for aux vectors */
-    v_lines = (int*)malloc(size_matrix * sizeof(int));
-    v_columns = (int*)malloc(size_matrix * sizeof(int));
-
     /* Setting random values (matriz C with -1) */
     for(i = 0; i < size_matrix; i++){
         for (j = 0; j < size_matrix; j++) {
             a[i][j] = i + j;
             b[i][j] = i * j;
             c[i][j] = -1;
+            printf("%d\t", c[i][j]);
         }
+        printf("linha %d \n", i);
     }
 
-    /* Setting random values (matriz C with -1) */
-    for(i = 0; i < size_matrix; i++){
-        v_lines[i] = i;
-        v_columns[i] = i;
+    /* Dynamic allocation for aux arrays */
+    // v_coordinates = (int**)malloc(size_matrix * size_matrix * sizeof(int*));
+    // for (i = 0; i < size_matrix * size_matrix; i++) {
+    //         v_coordinates[i] = (int*)malloc(2 * sizeof(int));
+    // }
+
+    /* Random allocation of coordinate pairs in a stack */
+    // stack initialization
+    node *stack = (node*)malloc(sizeof(node));
+    if(!stack){
+        printf("Sem memória disponivel\n");
+        exit(1);
+    } else {
+        startStack(stack);
     }
 
-    /* Setting 0 to vector*/
+    /* Populating arrays with size_matrix possibilities */
     for (i = 0; i < size_matrix; i++) {
-        v_lines[i] = 0;
-        v_columns[i] = 0;
+        for (j = 0; j < size_matrix; j++)
+            push(stack, i, j);
     }
 
-    thread_handles = malloc (thread_count*sizeof(pthread_t));
+    exibe(stack);
+
+    shuffle(stack);
+
+    srand(time(NULL));
+    // random i and j to create pairs.
+    // iteration size_matrix * size_matrix times
+    // for (i = 0; i < size_matrix * size_matrix; i++) {
+    //         do {
+    //             // get values between 0 and size_matrix. This value is the index
+    //             // of v_lines array
+    //             x = rand() % size_matrix;
+    //             if(x){}
+    //         } while(/* condition */);
+    //
+    //         y = rand() % size_matrix; // get values between 0 and size_matrix
+    // }
+
+    thread_handles = malloc (thread_count * sizeof(pthread_t));
 
     for (thread = 0; thread < thread_count; thread++)  //Creates thread 0 to thread_count-1
         pthread_create(&thread_handles[thread], NULL,
@@ -105,8 +133,7 @@ int main(int argc, char* argv[]) {
         free(a);
         free(b);
         free(c);
-        free(v_columns);
-        free(v_lines);
+        free(v_coordinates);
     }  /* main */
 
     /*------------------------------ | Thread Function | -------------------------------------*/
