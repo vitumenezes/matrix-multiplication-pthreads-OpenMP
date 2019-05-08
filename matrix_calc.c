@@ -1,33 +1,16 @@
-/* File:
-*    pth_hello.c
-*
-* Purpose:
-*    Illustrate basic use of pthreads:  create some threads,
-*    each of which prints a message.
-*
-* Input:
-*    none
-* Output:
-*    message from each thread
-*
-* Compile:  gcc -g -Wall -o pth_hello pth_hello.c -lpthread
-* Usage:    ./pth_hello <thread_count>
-*
-* IPP:   Section 4.2 (p. 153 and ff.)
-*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
 #include <stdbool.h>
 
-#include "aux_stack.c"
+#include "stack.c"
 
 const int MAX_THREADS = 64;
 
 /* Global variable:  accessible to all threads */
 int thread_count;
 
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex;
 
 void Usage(char* prog_name);
 void *matrizCalc(void* rank);  /* Thread function */
@@ -37,37 +20,40 @@ int **a;
 int **b;
 int **c;
 int **v_coordinates;
+/* Creating the stack */
+node *stack;
+
 
 int main(int argc, char* argv[]) {
     /*-------------------------------- | Main Function |------------------------------------*/
-    long       thread;  /* Use long in case of a 64-bit system */
+    long       thread;
     pthread_t* thread_handles;
 
     /* Get number of threads from command line */
     if (argc != 3) Usage(argv[0]);
         thread_count = strtol(argv[1], NULL, 10);
     if (thread_count <= 0 || thread_count > MAX_THREADS) Usage(argv[0]);
-    /* Get number of size_matrix */
 
+    /* Get number of size_matrix */
     size_matrix = atoi(argv[2]);
 
     /* Dynamic allocation for matrices */
-    // Allocating lines
     a = (int**)malloc(size_matrix * sizeof(int*));
     b = (int**)malloc(size_matrix * sizeof(int*));
     c = (int**)malloc(size_matrix * sizeof(int*));
-    // Allocating columns
     for(i = 0; i < size_matrix; i++){
         a[i] = (int*)malloc(size_matrix * sizeof(int));
         b[i] = (int*)malloc(size_matrix * sizeof(int));
         c[i] = (int*)malloc(size_matrix * sizeof(int));
-    }
+    } /* endfor */
 
-    /* Allocating aux array to all possible (x,y)pairs */
+    /* Dynamic allocation to stack*/
+    stack = (node *)malloc(sizeof(node));
+    /* Allocating auxiliar array to all possible (x,y)pairs */
     v_coordinates = (int**)malloc(size_matrix * size_matrix * sizeof(int*));
     for (i = 0; i < size_matrix * size_matrix; i++) {
         v_coordinates[i] = (int*)malloc(2 * sizeof(int));
-    }
+    } /* endfor */
 
     /* Setting random values (matriz C with -1) */
     for(i = 0; i < size_matrix; i++){
@@ -76,9 +62,10 @@ int main(int argc, char* argv[]) {
             b[i][j] = i * j;
             c[i][j] = -1;
         }
-    }
+    } /* endfor */
 
-    /* Populating v_coordinates with size_matrix * size_matrix possible pairs */
+    /* Populating v_coordinates with size_matrix * size_matrix possible pairs
+    (in order) */
     for (i = 0; i < size_matrix * size_matrix; i+=size_matrix) {
         for (j = i; j < i + size_matrix; j++){
             v_coordinates[j][0] = count_x;
@@ -87,7 +74,7 @@ int main(int argc, char* argv[]) {
         }
         count_y = 0;
         count_x++;
-    }
+    } /* endfor */
 
     /* Shuffling the array of coordinates */
     srand(time(NULL));
@@ -103,13 +90,22 @@ int main(int argc, char* argv[]) {
 
         v_coordinates[second][0] = x;
         v_coordinates[second][1] = y;
-    }
+    } /* endfor */
 
-    printf("\n");
+    if(!stack){
+        printf("Error! No memory available.\n");
+        exit(1);
+    } else
+        startStack(stack);
+
+    /* Pushing all shuffled possibilities to the stack */
     for (i = 0; i < size_matrix * size_matrix; i++) {
-        printf("%d%d\t",v_coordinates[i][0], v_coordinates[i][1]);
-    }
+        int x = v_coordinates[i][0];
+        int y = v_coordinates[i][1];
+        push(stack, x, y);
+    } /* endfor */
 
+    show(stack);
     thread_handles = malloc (thread_count * sizeof(pthread_t));
 
     for (thread = 0; thread < thread_count; thread++)  //Creates thread 0 to thread_count-1
@@ -119,65 +115,83 @@ int main(int argc, char* argv[]) {
     for (thread = 0; thread < thread_count; thread++)
         pthread_join(thread_handles[thread], NULL);
 
-    for (i = 0; i < size_matrix; i++) {
-        for (j = 0; j < size_matrix; j++) {
-            printf("%d\t", c[i][j]);
-        }
-        printf("\n");
-    }
+    // for (i = 0; i < size_matrix; i++) {
+    //     for (j = 0; j < size_matrix; j++) {
+    //         printf("%d\t", a[i][j]);
+    //     }
+    //     printf("\n");
+    // }
+    // printf("\n");
+    //
+    // for (i = 0; i < size_matrix; i++) {
+    //     for (j = 0; j < size_matrix; j++) {
+    //         printf("%d\t", b[i][j]);
+    //     }
+    //     printf("\n");
+    // }
+    // printf("\n");
+    //
+    // for (i = 0; i < size_matrix; i++) {
+    //     for (j = 0; j < size_matrix; j++) {
+    //         printf("%d\t", c[i][j]);
+    //     }
+    //     printf("\n");
+    // }
+
+    show(stack);
 
     free(thread_handles);
     free(a);
     free(b);
     free(c);
     free(v_coordinates);
+    free(stack);
 
     return 0;
 }  /* main */
 
     /*------------------------------ | Thread Function | -------------------------------------*/
-    void *matrizCalc(void* rank) {
-        long my_rank = (long) rank;  /* Use long in case of 64-bit system */
-        bool result = false;
-        int index, x, y, mult_result = 0;
-        srand(time(NULL));
+void *matrizCalc(void* rank) {
+    long my_rank = (long) rank;
+    int x, y, mult_result = 0;
+    node *tmp;
 
-        printf("\n\n");
-        do {
-            index = rand() % size_matrix * size_matrix;
+    srand(time(NULL));
 
-            if (v_coordinates[index][0] != -1) {
-                //aqui tem que ter uma condição verificando se o dado
-                //está sendo acessado (exclusão)
-                if (true) {
-                    x = v_coordinates[index][0];
-                    y = v_coordinates[index][1];
+    // Interruped only when the stack is empty
+    while(true){
+        pthread_mutex_lock(&mutex); // lock to pick up the stack element
+        if (stack->prox != NULL){ // empty stack?
+            tmp = pop(stack);
+            x = tmp->x;
+            y = tmp->y;
 
-                    for (i = 0; i < size_matrix; i++){
-                        mult_result += a[x][i] * b[i][y];
-                        printf("%d * %d + ", a[x][i], b[i][y]);
-                    }
-                    printf("= %d\n", mult_result);
-                    printf("Calculo do elemento %d %d da matriz C = %d\n", x, y, mult_result);
-                    c[x][y] = mult_result;
-                }
-                mult_result = 0;
-                v_coordinates[index][0] = -1;
+            // individual calculation to each pair
+            for (i = 0; i < size_matrix; i++){
+                mult_result += a[x][i] * b[i][y];
             }
 
-            for (i = 0; !result && i < size_matrix * size_matrix; i++)
-                if(v_coordinates[i][0] != -1) result = false;
-            printf("%d\n", result);
-        } while(!result);
+            // unlock after have done all the calculation
+            pthread_mutex_unlock(&mutex);
 
-        // printf("Hello from thread %ld of %d\n", my_rank, thread_count);
+            c[x][y] = mult_result; // attribution to C matrix
+            mult_result = 0; // reset to the next iteration
+        } else {
+            // another unlock in case of not entering the IF condition
+            pthread_mutex_unlock(&mutex);
+            break; // if is empty, break the while loop
+        }
+    }
 
-        return NULL;
-    }  /* Hello */
+    // just for Debug
+    printf("Goodbye from Thread %d :D\n", my_rank);
 
-    /*-------------------------------------------------------------------*/
-    void Usage(char* prog_name) {
-        fprintf(stderr, "usage: %s <number of threads>\n", prog_name);
-        fprintf(stderr, "0 < number of threads <= %d\n", MAX_THREADS);
-        exit(0);
-    }  /* Usage */
+    return NULL;
+}  /* matrizCalc */
+
+/*-------------------------------------------------------------------*/
+void Usage(char* prog_name) {
+    fprintf(stderr, "usage: %s <number of threads>\n", prog_name);
+    fprintf(stderr, "0 < number of threads <= %d\n", MAX_THREADS);
+    exit(0);
+}  /* Usage */
