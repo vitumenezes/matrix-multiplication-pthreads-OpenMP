@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <stdbool.h>
+#include "semaphore.h"
 
 #include "stack.c"
 
@@ -22,10 +23,10 @@ int **c;
 int **v_coordinates;
 /* Creating the stack */
 node *stack;
-
+sem_t *v_semaphores;
 
 int main(int argc, char* argv[]) {
-    /*-------------------------------- | Main Function |------------------------------------*/
+    /*--------------------------| Main Function |----------------------------*/
     long       thread;
     pthread_t* thread_handles;
 
@@ -37,6 +38,7 @@ int main(int argc, char* argv[]) {
     /* Get number of size_matrix */
     size_matrix = atoi(argv[2]);
 
+    /*------------------------ | Dynamic Allocations |-----------------------*/
     /* Dynamic allocation for matrices */
     a = (int**)malloc(size_matrix * sizeof(int*));
     b = (int**)malloc(size_matrix * sizeof(int*));
@@ -47,14 +49,6 @@ int main(int argc, char* argv[]) {
         c[i] = (int*)malloc(size_matrix * sizeof(int));
     } /* endfor */
 
-    /* Dynamic allocation to stack*/
-    stack = (node *)malloc(sizeof(node));
-    /* Allocating auxiliar array to all possible (x,y)pairs */
-    v_coordinates = (int**)malloc(size_matrix * size_matrix * sizeof(int*));
-    for (i = 0; i < size_matrix * size_matrix; i++) {
-        v_coordinates[i] = (int*)malloc(2 * sizeof(int));
-    } /* endfor */
-
     /* Setting random values (matriz C with -1) */
     for(i = 0; i < size_matrix; i++){
         for (j = 0; j < size_matrix; j++) {
@@ -63,6 +57,20 @@ int main(int argc, char* argv[]) {
             c[i][j] = -1;
         }
     } /* endfor */
+
+    /* Dynamic allocation to stack*/
+    stack = (node *)malloc(sizeof(node));
+    // Allocating auxiliar array to all possible (x,y)pairs
+    v_coordinates = (int**)malloc(size_matrix * size_matrix * sizeof(int*));
+    for (i = 0; i < size_matrix * size_matrix; i++) {
+        v_coordinates[i] = (int*)malloc(2 * sizeof(int));
+    } /* endfor */
+
+    /* Dynamic allocation and fill to array of semaphores */
+    v_semaphores = (sem_t *)malloc(size_matrix * size_matrix * sizeof(sem_t));
+    for (i = 0; i < size_matrix * size_matrix; i++) {
+        sem_init(&v_semaphores[i], 0, 0);
+    }
 
     /* Populating v_coordinates with size_matrix * size_matrix possible pairs
     (in order) */
@@ -106,37 +114,29 @@ int main(int argc, char* argv[]) {
     } /* endfor */
 
     show(stack);
+
     thread_handles = malloc (thread_count * sizeof(pthread_t));
 
     for (thread = 0; thread < thread_count; thread++)  //Creates thread 0 to thread_count-1
         pthread_create(&thread_handles[thread], NULL,
             matrizCalc, (void*) thread);
 
+    srand(time(NULL));
+    do {
+        int complete = 0, index, value, x, y;
+
+        index = rand() % (size_matrix * size_matrix);
+        sem_getvalue(&v_semaphores[i], &value);
+
+        if (value == 1) {
+            // x =  / 
+        }
+
+    } while(complete < (size_matrix * size_matrix));
+
+
     for (thread = 0; thread < thread_count; thread++)
         pthread_join(thread_handles[thread], NULL);
-
-    // for (i = 0; i < size_matrix; i++) {
-    //     for (j = 0; j < size_matrix; j++) {
-    //         printf("%d\t", a[i][j]);
-    //     }
-    //     printf("\n");
-    // }
-    // printf("\n");
-    //
-    // for (i = 0; i < size_matrix; i++) {
-    //     for (j = 0; j < size_matrix; j++) {
-    //         printf("%d\t", b[i][j]);
-    //     }
-    //     printf("\n");
-    // }
-    // printf("\n");
-    //
-    // for (i = 0; i < size_matrix; i++) {
-    //     for (j = 0; j < size_matrix; j++) {
-    //         printf("%d\t", c[i][j]);
-    //     }
-    //     printf("\n");
-    // }
 
     show(stack);
 
@@ -174,6 +174,9 @@ void *matrizCalc(void* rank) {
             // unlock after have done all the calculation
             pthread_mutex_unlock(&mutex);
 
+            // post (+1) at the corresponding semaphore
+            sem_post(&v_semaphores[x*size_matrix+y]);
+
             c[x][y] = mult_result; // attribution to C matrix
             mult_result = 0; // reset to the next iteration
         } else {
@@ -184,7 +187,7 @@ void *matrizCalc(void* rank) {
     }
 
     // just for Debug
-    printf("Goodbye from Thread %d :D\n", my_rank);
+    printf("Goodbye from Thread %ld :D\n", my_rank);
 
     return NULL;
 }  /* matrizCalc */
