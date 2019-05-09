@@ -10,9 +10,7 @@ const int MAX_THREADS = 64;
 
 /* Global variable:  accessible to all threads */
 int thread_count;
-
 pthread_mutex_t mutex;
-
 void Usage(char* prog_name);
 void *matrizCalc(void* rank);  /* Thread function */
 int i, j, m, n, count_x = 0, count_y = 0;
@@ -22,9 +20,8 @@ int **b;
 int **c;
 int **d;
 int **v_coordinates;
-/* Creating the stack */
-node *stack;
-sem_t *v_semaphores;
+node *stack; // Creating the stack to store the pairs
+sem_t *v_semaphores; // Array of semaphores
 
 int main(int argc, char* argv[]) {
     /*--------------------------| Main Function |----------------------------*/
@@ -117,8 +114,6 @@ int main(int argc, char* argv[]) {
         push(stack, x, y);
     } /* endfor */
 
-    show(stack);
-
     /*-------------------------- | Threads Session |--------------------------*/
     thread_handles = malloc (thread_count * sizeof(pthread_t));
 
@@ -130,10 +125,8 @@ int main(int argc, char* argv[]) {
     /* main thread requests in matriz C */
     srand(time(NULL));
     int complete = 0;
-    int incre = 0;
     int index, value, x, y;
     do {
-
         index = rand() % (size_matrix * size_matrix);
         sem_getvalue(&v_semaphores[index], &value);
 
@@ -149,45 +142,34 @@ int main(int argc, char* argv[]) {
                 complete++;
                 // printf("Valor de complete = %d\n", complete);
             }
-        } else {
-            printf("Valor de complete NÃO INCREMENTADO =========== value = %d\n", value);
         }
-        incre++;
-        printf("Tentativa %d ----- index %d ----- complete %d\n",incre, index, complete);
     } while(complete < (size_matrix * size_matrix));
 
     for (thread = 0; thread < thread_count; thread++)
         pthread_join(thread_handles[thread], NULL);
 
-
     /*----------------------- | End threads Session |-------------------------*/
 
-    show(stack);
-
-    // for (i = 0; i < size_matrix * size_matrix; i++) {
-    //     int v;
-    //     sem_getvalue(&v_semaphores[index], &v);
-    //     printf("%d ", v);
-    // }
-
-    printf("\nMATRIZ C:\n");
-
+    FILE * fp;
+    fp = fopen ("cmatriz.txt", "w+");
     for (i = 0; i < size_matrix; i++) {
         for (j = 0; j < size_matrix; j++) {
-            printf("%d ", c[i][j]);
+            fprintf(fp, "%d ", c[i][j]);
         }
-        printf("\n");
+        fprintf(fp, "\n");
     }
 
-    printf("\nMATRIZ D:\n");
-
+    FILE * pf;
+    pf = fopen ("dmatriz.txt", "w+");
     for (i = 0; i < size_matrix; i++) {
         for (j = 0; j < size_matrix; j++) {
-            printf("%d ", d[i][j]);
+            fprintf(pf, "%d ", c[i][j]);
         }
-        printf("\n");
+        fprintf(pf, "\n");
     }
 
+    fclose(fp);
+    fclose(pf);
     free(thread_handles);
     free(a);
     free(b);
@@ -195,6 +177,8 @@ int main(int argc, char* argv[]) {
     free(d);
     free(v_coordinates);
     free(stack);
+
+
 
     return 0;
 }  /* main */
