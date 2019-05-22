@@ -11,11 +11,11 @@ const int MAX_THREADS = 64;
 
 /* Global variable:  accessible to all threads */
 int thread_count;
-pthread_mutex_t mutex;
-pthread_mutex_t mutex_threads_working;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex_threads_working = PTHREAD_MUTEX_INITIALIZER;
 void Usage(char* prog_name);
 void *matrizCalc(void* rank);  /* Thread function */
-int i, j, m, n, count_x = 0, count_y = 0;
+int i, j, m, n, count_x = 0, count_y = 0, count = 1;
 int size_matrix, threads_working;
 int **a;
 int **b;
@@ -58,10 +58,11 @@ int main(int argc, char* argv[]) {
     } /* endfor */
 
     /* Setting random values (matriz C with -1) */
+    srand(time(NULL));
     for(i = 0; i < size_matrix; i++){
         for (j = 0; j < size_matrix; j++) {
-            a[i][j] = i + j;
-            b[i][j] = i * j;
+            a[i][j] = rand() % 100;
+            b[i][j] = rand() % 100;
             c[i][j] = -1;
             d[i][j] = -2;
         }
@@ -69,7 +70,7 @@ int main(int argc, char* argv[]) {
 
     /* Dynamic allocation to stack*/
     stack = (node *)malloc(sizeof(node));
-    // Allocating auxiliar array to all possible (x,y)pairs
+    /* Allocating auxiliar array to all possible (x,y)pairs */
     v_coordinates = (int**)malloc(size_matrix * size_matrix * sizeof(int*));
     for (i = 0; i < size_matrix * size_matrix; i++) {
         v_coordinates[i] = (int*)malloc(2 * sizeof(int));
@@ -122,9 +123,9 @@ int main(int argc, char* argv[]) {
         push(stack, x, y);
     } /* endfor */
 
-    start = clock();
-    /*-------------------------- | Threads Session |--------------------------*/
     thread_handles = malloc (thread_count * sizeof(pthread_t));
+    /*-------------------------- | Threads Session |--------------------------*/
+    start = clock(); // start clock only for calculation
 
     /* Creates thread 0 to thread_count-1 */
     for (thread = 0; thread < thread_count; thread++)
@@ -154,8 +155,9 @@ int main(int argc, char* argv[]) {
     for (thread = 0; thread < thread_count; thread++)
         pthread_join(thread_handles[thread], NULL);
 
-    end = clock();
+    end = clock(); // end clock
     /*----------------------- | End threads Session |-------------------------*/
+
     free(thread_handles);
     free(a);
     free(b);
@@ -168,7 +170,7 @@ int main(int argc, char* argv[]) {
 
     FILE *tempo;
 
-    tempo = fopen("tempo_de_exec.txt", "a");
+    tempo = fopen("tempo_de_exec_test.txt", "a");
 
     fprintf(tempo,"Problem Size = %d ----- Thread number = %d ----- Runtime = %f\n", size_matrix, thread_count, total_time);
     fclose(tempo);
@@ -176,57 +178,42 @@ int main(int argc, char* argv[]) {
     return 0;
 }  /* main */
 
-    /*------------------------------ | Thread Function | -------------------------------------*/
+/*------------------------- | Thread Function | -----------------------------*/
 void *matrizCalc(void* rank) {
-    int x, y, mult_result = 0, count = 0;
-    node *tmp;
+    int k, local_x, local_y, mult_result = 0;
+    node *local_tmp;
 
-    // printf("I'm the thread %ld and i get in the function!\n", my_rank);
     srand(time(NULL));
 
     // Interruped only when the stack is empty
     while(true){
         pthread_mutex_lock(&mutex); // lock to pick up the stack element
-        if (stack->prox != NULL){ // empty stack?
-            tmp = pop(stack);
+        if (stack->prox == NULL){
             pthread_mutex_unlock(&mutex);
-            if(tmp->x ==  NULL){
-                printf("Rapaz deu bronca, X é nulo e Y = %d\n", tmp->y);
-                exit(0);
-            } else if(tmp->y == NULL){
-                printf("Rapaz deu bronca, Y é nulo e X = %d\n", tmp->x);
-                exit(0);
-            }
-            x = tmp->x;
-            y = tmp->y;
-            printf("Valores de x = %d e y = %d e count é %d:\n", x, y, count);
+            break;
+        } // empty stack?
 
-            // individual calculation to each pair
-            for (i = 0; i < size_matrix; i++){
-                mult_result += a[x][i] * b[i][y];
-            }
+        local_tmp = pop(stack);
+        pthread_mutex_unlock(&mutex);
 
-            // unlock after have done all the calculation
+        local_x = local_tmp->x;
+        local_y = local_tmp->y;
 
-            // post (+1) at the corresponding semaphore
-            sem_post(&v_semaphores[x*size_matrix+y]);
-
-            c[x][y] = mult_result; // attribution to C matrix
-            mult_result = 0; // reset to the next iteration
-            count++;
-        } else {
-            // another unlock in case of not entering the IF condition
-            pthread_mutex_unlock(&mutex);
-            break; // if is empty, break the while loop
+        // individual calculation to each pair
+        for (k = 0; k < size_matrix; k++){
+            mult_result += a[local_x][k] * b[k][local_y];
         }
+
+        c[local_x][local_y] = mult_result; // attribution to C matrix
+        mult_result = 0; // reset to the next iteration
+
+        // post (+1) at the corresponding semaphore
+        sem_post(&v_semaphores[local_x*size_matrix+local_y]);
     }
 
-    // just for Debug
     pthread_mutex_lock(&mutex_threads_working);
     threads_working--;
     pthread_mutex_unlock(&mutex_threads_working);
-
-    // printf("I'm the thread %ld and i get OUT the function. I've calculate %d positions\n", my_rank, count);
 
     return NULL;
 }  /* matrizCalc */

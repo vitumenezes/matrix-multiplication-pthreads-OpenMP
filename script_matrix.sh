@@ -1,16 +1,5 @@
-#!/bin/bash
-
-#SBATCH --partition=test
-#SBATCH --job-name=PI
-#SBATCH --output=PI.out
-#SBATCH --error=PI.err
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=6
-#SBATCH --time=0-0:30
-#SBATCH --hint=compute_bound
-#SBATCH --exclusive
-
-rm tempo_de_exec.txt
+rm tempo_de_exec_test.txt
+touch tempo_de_exec_test.txt
 
 #Compila o código
 gcc -g -Wall -o matrix matrix_calc.c -lpthread
@@ -19,18 +8,18 @@ gcc -g -Wall -o matrix matrix_calc.c -lpthread
 
 	tentativas=4 #Quantas vezes o código será executado
 
-	for size in 100 200 300 400 500 #tamanho do problema
+	for size in 50 100 200 400 #tamanho do problema
 	do
-		#echo -e "Size of problem: $size" >> "tempo_de_exec.txt"
+		echo -e "===================================================================\n" >> "tempo_de_exec_test.txt"
 			for thread in 8 16 32 63 #números de threads utilizadas
 			do
-				#echo -e "\n$thread\t$size\t\t\c" >> "tempo_de_exec.txt"
 				for tentativa in $(seq $tentativas)
 				do
 					echo -e `./matrix $thread $size`
 				done
+				echo -e " " >> "tempo_de_exec_test.txt"
 			done
-		#echo -e "\n" >> "tempo_de_exec.txt"
+			echo -e "\n===================================================================" >> "tempo_de_exec_test.txt"
 	done
 
 exit
