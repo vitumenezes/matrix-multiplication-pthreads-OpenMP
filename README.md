@@ -1,6 +1,6 @@
-# Matrix Calculation With Parallel Programming Using Pthreads (Shared Memory)
+# Matrix Calculation With Parallel Programming Using Pthreads and OpenMP (Shared Memory)
 
-Program built for the subject "Special Topics in Internet of Things" of the bachelor's degree in information technology - BTI of the Federal University of Rio Grande do Norte - UFRN.
+Programs built for the subject "Special Topics in Internet of Things" of the bachelor's degree in information technology - BTI of the Federal University of Rio Grande do Norte - UFRN.
 
 ## The problem
 
@@ -22,7 +22,7 @@ Execution: `./serial_matrix SZ_OF_PROBLEM`
 
 ### Parallel
 
-The parallel implementation was constructed so that each thread created individually calculates a random element of the array C. For this, an auxiliary structure (stack) was created. The elements (pairs x and y) are drawn and stacked so that the threads remove them. This removal occurs in a critical region, controlled by a Mutex.
+The parallel implementation was constructed so that each thread created individually calculates a random element of the array C. For this, an auxiliary structure (stack) was created. The elements (pairs x and y) are drawn and stacked so that the threads remove them. This removal occurs in a critical region controlled by a Mutex, in the case of the implementation in pthread.
 
 To run:
 
