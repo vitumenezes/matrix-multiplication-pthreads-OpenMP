@@ -11,7 +11,7 @@ gcc -g -Wall -o matrix matrix_calc.c -lpthread
 	for size in 50 100 200 400 #tamanho do problema
 	do
 		echo -e "===================================================================\n" >> "tempo_de_exec_test.txt"
-			for thread in 8 16 32 63 #números de threads utilizadas
+			for thread in 8 16 32 #números de threads utilizadas
 			do
 				for tentativa in $(seq $tentativas)
 				do
