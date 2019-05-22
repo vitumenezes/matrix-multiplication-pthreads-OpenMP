@@ -32,3 +32,7 @@ Execution: `./matrix SZ_OF_THREADS SZ_OF_PROBLEM`
 
 `SZ_OF_PROBLEM` is a **int** that represents the number of lines of the matrix.  
 `SZ_OF_THREADS` is a **int** that represents the number of threads used.
+
+## Scripts and outputs
+
+Two scripts were created to atutomate programs. The run-time outputs will ve in the **time_de_exec.txt** and **time_de_exec_serial.txt**.
