@@ -23,7 +23,7 @@ int main(int argc, char* argv[]) {
    int **b;
    int **c;
    double total_time;
-   clock_t start, end;
+   double start;
 
    /* Get number of threads and the size of matrix, repectively */
    int thread_count = strtol(argv[1], NULL, 10);
@@ -40,29 +40,34 @@ int main(int argc, char* argv[]) {
       c[i] = (int*)malloc(size_matrix * sizeof(int));
    } /* endfor */
 
-   /* Fill matrices using all threads. Each thread fill a single line. */
-   srand(time(NULL));
-   # pragma omp parallel for num_threads(thread_count) private(i,j)
-   for (i = 0; i < size_matrix; i++) {
-      int my_rank = omp_get_thread_num();
-      for (j = 0; j < size_matrix; j++) {
-         a[i][j] = rand() % 100;
-         b[i][j] = rand() % 100;
-         c[i][j] = -1;
-      }
-   }
 
-   start = clock(); // start clock only for calculation
+   srand(time(NULL));
    /* Opens parallel zone */
-   # pragma omp parallel num_threads(thread_count) default(none) shared(a,b,c) private(i,j) firstprivate(size_matrix)
+   # pragma omp parallel num_threads(thread_count) default(none) shared(a,b,c,start) private(i,j) firstprivate(size_matrix)
    {
+
+       /* Fill matrices using all threads. Each thread fill a single line. */
+       # pragma omp parallel for default(none) firstprivate(size_matrix) private(i,j) shared(a,b,c)
+       for (i = 0; i < size_matrix; i++) {
+	  for (j = 0; j < size_matrix; j++) {
+        	 a[i][j] = rand() % 100;
+        	 b[i][j] = rand() % 100;
+        	 c[i][j] = -1;
+       	  }
+       }
+
+      # pragma omp single
+      {
+	start = omp_get_wtime(); // start clock only for calculation
+      }    
+ 
       /* Just one thread creates the tasks */
       # pragma omp single
       {
          for (i = 0; i < size_matrix; i++) {
             for (j = 0; j < size_matrix; j++) {
                /* One task for each element on C matrix*/
-               # pragma omp task
+               # pragma omp task firstprivate(i,j)
                {
                   int k, mult_result = 0;
                   for (k = 0; k < size_matrix; k++){
@@ -74,11 +79,10 @@ int main(int argc, char* argv[]) {
          }
       } /* End single */
    } /* End parallel zone */
-   end = clock();
+   total_time = omp_get_wtime() - start;
 
-   total_time = ((double) (end - start)) / CLOCKS_PER_SEC;
    FILE *tempo;
-   tempo = fopen("../runtimes/tempo_de_exec_omp.txt", "a");
+   tempo = fopen("/home/vgdmenezes/openmp/runtimes/tempo_de_exec_omp.txt", "a");
    fprintf(tempo,"Problem Size = %d ----- Thread number = %d ----- Runtime = %f\n", size_matrix, thread_count, total_time);
    fclose(tempo);
 
