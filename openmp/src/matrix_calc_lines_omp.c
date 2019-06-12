@@ -49,11 +49,11 @@ int main(int argc, char* argv[]) {
        /* Fill matrices using all threads. Each thread fill a single line. */
        # pragma omp parallel for default(none) firstprivate(size_matrix) private(i,j) shared(a,b,c)
        for (i = 0; i < size_matrix; i++) {
-	  for (j = 0; j < size_matrix; j++) {
-        	 a[i][j] = rand() % 100;
-        	 b[i][j] = rand() % 100;
-        	 c[i][j] = -1;
-       	  }
+	          for (j = 0; j < size_matrix; j++) {
+                  a[i][j] = rand() % 20;
+                  b[i][j] = rand() % 20;
+                  c[i][j] = -1;
+            }
        }
 
       # pragma omp single
@@ -65,18 +65,19 @@ int main(int argc, char* argv[]) {
       # pragma omp single
       {
          for (i = 0; i < size_matrix; i++) {
-            for (j = 0; j < size_matrix; j++) {
                /* One task for each element on C matrix*/
-               # pragma omp task firstprivate(i,j)
+               # pragma omp task firstprivate(i)
                {
-                  int k, mult_result = 0;
-                  for (k = 0; k < size_matrix; k++){
-                     mult_result += a[i][k] * b[k][j];
+                  int j, k, mult_result = 0;
+                  for (j = 0; j < size_matrix; j++) {
+                      for (k = 0; k < size_matrix; k++){
+                          mult_result += a[i][k] * b[k][j];
+                      }
+                      c[i][j] = mult_result;
+                      mult_result = 0;
                   }
-                  c[i][j] = mult_result;
                } /* End task */
             }
-         }
       } /* End single */
    } /* End parallel zone */
    total_time = omp_get_wtime() - start;
